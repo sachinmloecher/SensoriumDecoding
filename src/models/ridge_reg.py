@@ -10,7 +10,8 @@ sys.path.append("C:/Users/sachi/SensoriumDecoding/src/utils")
 # Local imports
 from metrics import pearson_correlation, rmse
 from data import load_args, get_training_ds
-
+# Change working directory to src
+os.chdir("C:/Users/sachi/SensoriumDecoding")
 
 class Args:
     def __init__(self):
