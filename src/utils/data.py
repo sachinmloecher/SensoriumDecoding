@@ -340,6 +340,11 @@ class MiceDataset(Dataset):
                 print(f"convert mouse {mouse_id} {tier} image to gray-scale")
             self.gray_scale = True
             self.image_shape = (1,) + self.image_shape[1:]
+        
+        if args.log_response:
+            self.log_response = True
+        else:
+            self.log_response = False
 
     def __len__(self):
         return len(self.indexes)
@@ -416,11 +421,24 @@ class MiceDataset(Dataset):
         response_precision[idx] = 1 / std[idx]
         self._response_precision = response_precision
 
+    def normalize_response(self, response: t.Union[np.ndarray, torch.Tensor]):
+        """Normalize response using the mean and std of the training set."""
+        return (response - self.response_stats["mean"]) / self.response_stats["std"]
+
+    def i_normalize_response(self, response: t.Union[np.ndarray, torch.Tensor]):
+        """Reverse normalization of response."""
+        return response * self.response_stats["std"] + self.response_stats["mean"]
+
     def transform_response(self, response: t.Union[np.ndarray, torch.Tensor]):
-        return response * self._response_precision
+        r = response * self._response_precision
+        # If log response, add 1 and take log
+        if self.log_response:
+            r = np.log(r + 1)
+        return self.normalize_response(r)
 
     def i_transform_response(self, response: t.Union[np.ndarray, torch.Tensor]):
-        return response / self._response_precision
+        r = response / self._response_precision
+        return self.i_normalize_response(r)
 
     def __getitem__(self, idx: t.Union[int, torch.Tensor], include_behavior=True, include_pupil=True):
         """Return data and metadata

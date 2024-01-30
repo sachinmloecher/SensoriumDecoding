@@ -1,0 +1,67 @@
+adam_beta1: 0.9
+adam_beta2: 0.9999
+adam_eps: 1e-08
+amp: false
+backend: null
+batch_size: 128
+behavior_mode: 1
+bias_mode: 0
+center_crop: 1.0
+clear_output_dir: false
+core: vit
+core_lr: 0.001647
+core_reg_scale: 0.5379
+criterion: poisson
+cropper_reg_scale: 0.0
+dataset: data/sensorium
+deterministic: false
+device: cpu
+disable_bias: false
+disable_grid_predictor: false
+dpi: 120
+drop_path: 0.0
+ds_name: sensorium
+ds_scale: 1
+emb_dim: 155
+epochs: 400
+format: svg
+git_hash: ba1ddc3
+grad_checkpointing: false
+gray_scale: false
+grid_predictor_dim: 2
+hostname: LAPTOP-SURFBC6A
+input_shape: [1, 144, 256]
+limit_data: null
+log_response: true
+lr: 0.001647
+micro_batch_size: 16
+mlp_dim: 488
+mouse_ids: [A, B, C, D, E]
+num_blocks: 4
+num_heads: 4
+num_workers: 2
+output_dir: runs/v1t_model
+output_shapes:
+  A: [8372]
+  B: [7344]
+  C: [7334]
+  D: [8107]
+  E: [8098]
+p_dropout: 0.0229
+patch_mode: 0
+patch_size: 8
+patch_stride: 1
+pretrain_core: ''
+readout: gaussian2d
+readout_reg_scale: 0.0076
+resize_image: 1
+save_plots: false
+seed: 1234
+shift_mode: 2
+shifter_reg_scale: 0.0
+t_dropout: 0.2544
+trainable_params: 9953334
+use_lsa: false
+use_wandb: false
+verbose: 1
+wandb_group: ''

@@ -1,0 +1,12 @@
+version: '3'
+services:
+  jupyter:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8888:8888"
+    volumes:
+      - .:/home/jovyan/work/SensoriumDecoding
+    mem_limit: 16g
+    shm_size: '10gb'
