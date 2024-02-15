@@ -35,8 +35,6 @@ def main():
     fig2, axes2 = plt.subplots(nrows=2, ncols=3, figsize=(15, 10))
     axes2 = axes2.flatten()
 
-    response_data = []
-
     for idx, mouse in enumerate(['A', 'B', 'C', 'D', 'E']):
         print(mouse)
         # Train data for pixel intensities

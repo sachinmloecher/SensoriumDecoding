@@ -7,6 +7,8 @@ from tqdm import tqdm
 from zipfile import ZipFile
 from datetime import datetime
 from torch.utils.data import Dataset, DataLoader
+from torchvision import transforms
+import torch.nn.functional as F
 from ruamel.yaml import YAML
 
 yaml = YAML(typ="safe")
@@ -306,6 +308,9 @@ class MiceDataset(Dataset):
         mouse_dir = os.path.join(data_dir, mouse2path[mouse_id])
         metadata = load_mouse_metadata(self.ds_name, mouse_dir=mouse_dir)
         self.behavior_mode = args.behavior_mode
+        self.downsample = args.downsample
+        self.crop_factor = args.crop_factor
+        self.target_size = args.target_size
         if self.behavior_mode and mouse_id == "S0":
             raise ValueError("Mouse S0 does not have behaviour data.")
         self.mouse_dir = metadata["mouse_dir"]
@@ -371,12 +376,43 @@ class MiceDataset(Dataset):
 
     def color2gray(self, image: np.ndarray):
         return np.mean(image, axis=0, keepdims=True)
+    
+    def crop_and_downsample(self, image, crop_factor, target_size):
+        # Assuming image has shape (C, H, W)
+        C, H, W = image.shape
+
+        # Calculate crop dimensions
+        crop_height = int(H * crop_factor)
+        crop_width = int(W * crop_factor)
+
+        # Calculate the center of the image
+        center_y = H // 2
+        center_x = W // 2
+
+        # Calculate the top-left corner of the crop
+        crop_y = max(0, center_y - crop_height // 2)
+        crop_x = max(0, center_x - crop_width // 2)
+
+        # Crop the image
+        cropped_image = image[:, crop_y:crop_y + crop_height, crop_x:crop_x + crop_width]
+        # Reshape to add batch dimension (assuming batch size is 1)
+        cropped_image = torch.from_numpy(cropped_image).float()
+
+        # Downsample the cropped image using interpolate
+        downsampled_image = F.interpolate(cropped_image.unsqueeze(0), size=tuple(target_size), mode='bilinear', align_corners=False)
+
+        # Squeeze the batch dimension and convert back to a numpy array
+        downsampled_image = downsampled_image.squeeze().numpy()
+
+        return downsampled_image
 
     def transform_image(self, image: np.ndarray):
         stats = self.image_stats
         image = (image - stats["mean"]) / stats["std"]
         if self.gray_scale:
             image = self.color2gray(image)
+        if self.downsample:
+            image = self.crop_and_downsample(image, self.crop_factor, self.target_size)
         return image
 
     def i_transform_image(self, image: t.Union[np.ndarray, torch.Tensor]):
@@ -403,7 +439,7 @@ class MiceDataset(Dataset):
     def transform_behavior(self, behavior: np.ndarray):
         """standardize behaviour"""
         stats = self.behavior_stats
-        return behavior / stats["std"]
+        return (behavior - stats['mean']) / stats["std"]
 
     def i_transform_behavior(self, behavior: np.ndarray):
         stats = self.behavior_stats
@@ -527,7 +563,7 @@ def get_training_ds(
 
     # settings for DataLoader
     dataloader_kwargs = {"batch_size": batch_size, "num_workers": args.num_workers}
-    if device.type in ("cuda", "mps"):
+    if device in ("cuda", "mps"):
         gpu_kwargs = {"prefetch_factor": 2, "pin_memory": True}
         dataloader_kwargs.update(gpu_kwargs)
 

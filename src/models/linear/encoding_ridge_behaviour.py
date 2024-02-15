@@ -58,15 +58,19 @@ def main():
         model = RidgeCV(alphas=[40000, 50000, 60000, 70000, 80000, 90000, 100000, 110000], scoring='r2', alpha_per_target=True)
 
         # Train data
-        X_train, y_train = [], []
+        X_train, y_train, behaviour_train = [], [], []
         for i, batch in enumerate(train_ds[mouse]):
             X_train_batch = np.array([sample.flatten().numpy() for sample in batch['image']])
             y_train_batch = np.array([sample.flatten().numpy() for sample in batch['response']])
+            behaviour_batch = np.array([sample.flatten().numpy() for sample in batch['behavior']])
+            pupil_batch = np.array([sample.flatten().numpy() for sample in batch['pupil_center']])
             X_train.extend(X_train_batch)
             y_train.extend(y_train_batch)
-            
+            behaviour_train.extend(np.concatenate((behaviour_batch, pupil_batch), axis=1))
+        
         # Divide my sqrt(N) like in paper
         y_train = np.array(y_train) / np.sqrt(len(y_train))
+        y_train = np.concatenate((y_train, np.array(behaviour_train)), axis=1)
         print(f"X_train shape (images): {np.array(X_train).shape}")
         print(f"y_train shape (responses): {np.array(y_train).shape}")
 
@@ -75,19 +79,22 @@ def main():
         print(f"Min alpha: {min(model.alpha_)}, Max alpha: {max(model.alpha_)}")
 
         # Test data
-        X_test, y_test = [], []
+        X_test, y_test, behaviour_test = [], [], []
         for i, batch in enumerate(test_ds[mouse]):
             X_test_batch = np.array([sample.flatten().numpy() for sample in batch['image']])
             y_test_batch = np.array([sample.flatten().numpy() for sample in batch['response']])
+            behaviour_batch = np.array([sample.flatten().numpy() for sample in batch['behavior']])
+            pupil_batch = np.array([sample.flatten().numpy() for sample in batch['pupil_center']])
             X_test.extend(X_test_batch)
             y_test.extend(y_test_batch)
+            behaviour_test.extend(np.concatenate((behaviour_batch, pupil_batch), axis=1))
         
         # Divide my sqrt(N) like in paper
         y_test = np.array(y_test) / np.sqrt(len(y_train))
+        y_test = np.concatenate((y_test, np.array(behaviour_test)), axis=1)
         print(f"X_test shape (images): {np.array(X_test).shape}")
         print(f"y_test shape (responses): {np.array(y_test).shape}")
         
-        y_test = np.array(y_test)
         y_pred = np.array(model.predict(X_test))
 
         correlations = [pearsonr(y_test[:, i], y_pred[:, i])[0] if np.std(y_test[:, i]) > 0 and np.std(y_pred[:, i]) > 0 else 0.0 for i in range(y_test.shape[1])]
@@ -102,7 +109,7 @@ def main():
         print(f"Average Column-wise Explained Variance Mouse {mouse}:", np.mean(explained_variance))
 
         # Save model (sklearn)
-        model_path = os.path.join("saved_models/sqrtNlogtransformEncoders", f"ridge_reg_{mouse}.pkl")
+        model_path = os.path.join("saved_models/downsampled/with_behaviour", f"ridge_reg_{mouse}.pkl")
         torch.save(model, model_path)
 
         # Plot correlations histogram for each mouse
@@ -140,10 +147,10 @@ def main():
 
 
     plt.tight_layout()
-    fig.savefig('figures/linear/sqrtNlogtransform/correlations.png')
-    fig2.savefig('figures/linear/sqrtNlogtransform/r2s.png')
-    fig3.savefig('figures/linear/sqrtNlogtransform/explained_variance.png')
-    fig4.savefig('figures/linear/sqrtNlogtransform/explained_variance_sorted.png')
+    fig.savefig('figures/linear/with_behaviour/correlations.png')
+    fig2.savefig('figures/linear/with_behaviour/r2s.png')
+    fig3.savefig('figures/linear/with_behaviour/explained_variance.png')
+    fig4.savefig('figures/linear/with_behaviour/explained_variance_sorted.png')
     plt.show()
 
 

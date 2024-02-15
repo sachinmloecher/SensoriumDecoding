@@ -1,0 +1,42 @@
+# Data loader
+mouse_ids: [A, B, C, D, E]
+dataset: data/sensorium
+batch_size: 512
+num_workers: 2
+behavior_mode: 0
+downsample: true
+crop_factor: 0.8
+target_size: [36, 64]
+gray_scale: false
+log_response: true
+use_wandb: false
+
+# Mouse specific MLP
+hidden_sizes: [64, 64]
+n_latent_features: 30
+activation: relu
+dropout_prob: 0.1
+neurons_per_mouse: {'A':8372, 'B':7344, 'C':7334, 'D':8107, 'E':8098}
+# Behavior MLP
+input_size_beh: 3
+hidden_sizes_beh: [64, 64]
+activation_beh: relu
+dropout_prob_beh: 0.1
+# Core model
+core: 'MLP'
+# MLP
+output_size: 2304
+hidden_sizes_mlp: [128, 256, 512]
+activation_mlp: relu
+dropout_prob_mlp: 0.1
+layer_norm: False
+
+# Training
+learning_rate: 0.001
+num_epochs: 10
+early_stopping: 10
+# Loss
+loss: 'MSE'
+# Optimizer
+optimizer: 'Adam'
+device: 'cpu'

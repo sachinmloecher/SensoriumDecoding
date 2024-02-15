@@ -6,7 +6,8 @@ backend: null
 batch_size: 128
 behavior_mode: 1
 bias_mode: 0
-center_crop: 1.0
+crop_factor: 0.8
+target_size: [36, 64]
 clear_output_dir: false
 core: vit
 core_lr: 0.001647
@@ -18,6 +19,7 @@ deterministic: false
 device: cpu
 disable_bias: false
 disable_grid_predictor: false
+downsample: true
 dpi: 120
 drop_path: 0.0
 ds_name: sensorium
