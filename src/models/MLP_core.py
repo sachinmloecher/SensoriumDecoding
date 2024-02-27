@@ -10,15 +10,21 @@ class MLP_core(nn.Module):
         self.activation = activation
 
         layers = []
-        prev_size = input_size
-        for hidden_size in hidden_sizes:
-            layers.append(nn.Linear(prev_size, hidden_size))
+        layers.append(nn.Linear(input_size, hidden_sizes[0]))
+        if layerNorm:
+            layers.append(nn.LayerNorm(hidden_sizes[0]))
+        layers.append(self.activation)
+
+        # Define the hidden layers
+        for i in range(len(hidden_sizes) - 1):
+            layers.append(nn.Linear(hidden_sizes[i], hidden_sizes[i+1]))
             if layerNorm:
-                layers.append(nn.LayerNorm(hidden_size))
+                layers.append(nn.LayerNorm(hidden_sizes[i+1]))
             layers.append(self.activation)
             layers.append(nn.Dropout(dropout_prob))
-            prev_size = hidden_size
-        layers.append(nn.Linear(prev_size, output_size))
+        
+        # Define the output layer
+        layers.append(nn.Linear(hidden_sizes[-1], output_size))
 
         self.net = nn.Sequential(*layers)
 

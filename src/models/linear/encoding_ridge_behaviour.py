@@ -55,7 +55,7 @@ def main():
 
     # Training data
     for idx, mouse in enumerate(['A', 'B', 'C', 'D', 'E']):
-        model = RidgeCV(alphas=[40000, 50000, 60000, 70000, 80000, 90000, 100000, 110000], scoring='r2', alpha_per_target=True)
+        model = RidgeCV(alphas=[1000, 5000, 8000, 10000, 20000, 40000, 50000, 60000, 70000, 80000, 90000, 100000, 110000], scoring='r2', alpha_per_target=True)
 
         # Train data
         X_train, y_train, behaviour_train = [], [], []
@@ -69,8 +69,8 @@ def main():
             behaviour_train.extend(np.concatenate((behaviour_batch, pupil_batch), axis=1))
         
         # Divide my sqrt(N) like in paper
-        y_train = np.array(y_train) / np.sqrt(len(y_train))
         y_train = np.concatenate((y_train, np.array(behaviour_train)), axis=1)
+        y_train = np.array(y_train) / np.sqrt(len(y_train))
         print(f"X_train shape (images): {np.array(X_train).shape}")
         print(f"y_train shape (responses): {np.array(y_train).shape}")
 
@@ -90,8 +90,9 @@ def main():
             behaviour_test.extend(np.concatenate((behaviour_batch, pupil_batch), axis=1))
         
         # Divide my sqrt(N) like in paper
-        y_test = np.array(y_test) / np.sqrt(len(y_train))
         y_test = np.concatenate((y_test, np.array(behaviour_test)), axis=1)
+        y_test = np.array(y_test) / np.sqrt(len(y_train))
+
         print(f"X_test shape (images): {np.array(X_test).shape}")
         print(f"y_test shape (responses): {np.array(y_test).shape}")
         

@@ -10,13 +10,17 @@ class MouseMLP(nn.Module):
         self.activation = activation
 
         layers = []
-        prev_size = input_size
-        for hidden_size in hidden_sizes:
-            layers.append(nn.Linear(in_features=prev_size, out_features=int(hidden_size)))
+        layers.append(nn.Linear(in_features=input_size, out_features=hidden_sizes[0]))
+        layers.append(self.activation)
+        
+        # Hidden Layers
+        for i in range(1, len(hidden_sizes)):
+            layers.append(nn.Linear(in_features=hidden_sizes[i-1], out_features=hidden_sizes[i]))
             layers.append(self.activation)
             layers.append(nn.Dropout(dropout_prob))
-            prev_size = hidden_size
-        layers.append(nn.Linear(prev_size, output_size))
+
+        # Output Layer
+        layers.append(nn.Linear(in_features=hidden_sizes[-1], out_features=output_size))
 
         self.net = nn.Sequential(*layers)
 

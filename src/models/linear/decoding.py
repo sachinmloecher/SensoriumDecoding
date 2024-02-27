@@ -100,7 +100,7 @@ def main():
         y_train = np.array(y_train[:, top_voxel_indices])
         y_pred_train = y_pred_train[:, top_voxel_indices]
         residuals_train = y_train - y_pred_train
-        Sigma = np.cov(residuals_train, rowvar=False)
+        Sigma = np.diag(np.var(residuals_train, axis=0))
 
         # Delete variables to save memory
         del y_train, y_pred_train, y_pred, X_test, explained_variance, residuals_train, top_voxel_indices, model

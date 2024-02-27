@@ -49,13 +49,22 @@ def main():
     )
 
     fig, axes = plt.subplots(2, 3, figsize=(15, 10))
+    plt.subplots_adjust(hspace=0.4)
     fig2, axes2 = plt.subplots(2, 3, figsize=(15, 10))
+    plt.subplots_adjust(hspace=0.4)
     fig3, axes3 = plt.subplots(2, 3, figsize=(15, 10))
+    plt.subplots_adjust(hspace=0.4)
     fig4, axes4 = plt.subplots(2, 3, figsize=(15, 10))
+    plt.subplots_adjust(hspace=0.4)
+    fig.delaxes(axes[1][2])
+    fig2.delaxes(axes2[1][2])
+    fig3.delaxes(axes3[1][2])
+    fig4.delaxes(axes4[1][2])
+
 
     # Training data
     for idx, mouse in enumerate(['A', 'B', 'C', 'D', 'E']):
-        model = RidgeCV(alphas=[40000, 50000, 60000, 70000, 80000, 90000, 100000, 110000], scoring='r2', alpha_per_target=True)
+        model = RidgeCV(alphas=[1000, 5000, 8000, 10000, 20000, 40000, 50000, 60000, 70000, 80000, 90000, 100000, 110000], scoring='r2', alpha_per_target=True)
 
         # Train data
         X_train, y_train = [], []
@@ -109,42 +118,43 @@ def main():
         row = idx // 3
         col = idx % 3
         axes[row, col].hist(correlations, bins=200, range=(-1, 1), color='blue', alpha=0.7)
-        axes[row, col].set_title(f'Mouse {mouse}')
-        axes[row, col].set_xlabel('Correlation')
-        axes[row, col].set_ylabel('Frequency')
+        axes[row, col].set_title(f'Mouse {mouse}', fontsize=18)
+        axes[row, col].set_xlabel('Correlation', fontsize=15)
+        axes[row, col].set_ylabel('Frequency', fontsize=15)
         axes[row, col].grid(True)
         
         # Plot explained variances histogram for each mouse
         axes2[row, col].hist(r2s, bins=200, range=(-1, 1), color='blue', alpha=0.7)
-        axes2[row, col].set_title(f'Mouse {mouse}')
-        axes2[row, col].set_xlabel('R2 Scores')
-        axes2[row, col].set_ylabel('Frequency')
+        axes2[row, col].set_title(f'Mouse {mouse}', fontsize=18)
+        axes2[row, col].set_xlabel('R2 Scores', fontsize=15)
+        axes2[row, col].set_ylabel('Frequency', fontsize=15)
         axes2[row, col].grid(True)
 
         axes3[row, col].hist(explained_variance, bins=200, range=(-1, 1), color='blue', alpha=0.7)
-        axes3[row, col].set_title(f'Mouse {mouse}')
-        axes3[row, col].set_xlabel('Explained Variance')
-        axes3[row, col].set_ylabel('Frequency')
+        axes3[row, col].set_title(f'Mouse {mouse}', fontsize=18)
+        axes3[row, col].set_xlabel('Explained Variance', fontsize=15)
+        axes3[row, col].set_ylabel('Frequency', fontsize=15)
         axes3[row, col].grid(True)
 
         # Sort explained variances
         sorted_explained_variance = sorted(explained_variance, reverse=True)
         # Plot with log scale on x-axis
         axes4[row, col].plot(sorted_explained_variance, color='b')
-        axes4[row, col].set_title(f'Mouse {mouse}')
-        axes4[row, col].set_xlabel('Neuron')
-        axes4[row, col].set_ylabel('Explained Variance')
+        axes4[row, col].set_title(f'Mouse {mouse}', fontsize=18)
+        axes4[row, col].set_xlabel('Neuron', fontsize=15)
+        axes4[row, col].set_ylabel('Explained Variance', fontsize=15)
         axes4[row, col].grid(True)
         axes4[row, col].set_xscale('log')  # Set x-axis to log scale
         axes4[row, col].set_xlim(1, len(sorted_explained_variance)+100)
 
 
     plt.tight_layout()
+    plt.show()
     fig.savefig('figures/linear/downsampled/sqrtNlogtransform/correlations.png')
     fig2.savefig('figures/linear/downsampled/sqrtNlogtransform/r2s.png')
     fig3.savefig('figures/linear/downsampled/sqrtNlogtransform/explained_variance.png')
     fig4.savefig('figures/linear/downsampled/sqrtNlogtransform/explained_variance_sorted.png')
-    plt.show()
+    
 
 
 if __name__ == "__main__":

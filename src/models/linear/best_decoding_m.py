@@ -54,11 +54,13 @@ def main():
 
         average_correlations.append(np.mean(mouse_correlations))
         print(f"Average pixel correlation for m={m}:", np.mean(mouse_correlations))
-    fig.suptitle("Average pixel correlation by m")
+    fig.suptitle("Average pixel correlation by m", fontsize=28)
     ax.plot(ms, average_correlations, marker='o', color='b', linestyle='-')
-    ax.set_xlabel('m')
-    ax.set_ylabel('Average Pixel-wise Correlation')
+    ax.set_xlabel('m', fontsize=20)
+    ax.set_ylabel('Average Pixel-wise Correlation', fontsize=20)
     ax.set_ylim(-0.1, 1)
+    ax.tick_params(axis='x', labelsize=16)  # Adjust the font size of x-axis ticks
+    ax.tick_params(axis='y', labelsize=16)
     ax.grid(True)
     plt.show()
     plt.savefig("figures/linear/downsampled/average_pixel_correlation_by_m.png")

@@ -10,6 +10,7 @@ from torch.utils.data import Dataset, DataLoader
 from torchvision import transforms
 import torch.nn.functional as F
 from ruamel.yaml import YAML
+from torch_geometric.data import Data
 
 yaml = YAML(typ="safe")
 
@@ -307,6 +308,10 @@ class MiceDataset(Dataset):
         mouse2path = get_mouse2path(self.ds_name)
         mouse_dir = os.path.join(data_dir, mouse2path[mouse_id])
         metadata = load_mouse_metadata(self.ds_name, mouse_dir=mouse_dir)
+        self.as_graph = args.as_graph
+        if self.as_graph:
+            self.edge_indices = args.edge_indices
+            self.edge_index = torch.load(os.path.join(self.edge_indices, f"mouse_{mouse_id}_edge_index.pt"))
         self.behavior_mode = args.behavior_mode
         self.downsample = args.downsample
         self.crop_factor = args.crop_factor
@@ -475,6 +480,11 @@ class MiceDataset(Dataset):
     def i_transform_response(self, response: t.Union[np.ndarray, torch.Tensor]):
         r = response / self._response_precision
         return self.i_normalize_response(r)
+    
+    def graph_response(self, response: t.Union[np.ndarray, torch.Tensor]):
+        node_features = self.transform_response(response)
+        data = Data(x=node_features, edge_index=self.edge_index)
+        return data
 
     def __getitem__(self, idx: t.Union[int, torch.Tensor], include_behavior=True, include_pupil=True):
         """Return data and metadata
@@ -492,7 +502,10 @@ class MiceDataset(Dataset):
         trial = self.indexes[idx]
         data = load_trial_data(mouse_dir=self.mouse_dir, trial=trial)
         data["image"] = self.transform_image(data["image"])
-        data["response"] = self.transform_response(data["response"])
+        if self.as_graph:
+            data["response"] = self.graph_response(data["response"])
+        else:
+            data["response"] = self.transform_response(data["response"])
         data["behavior"] = self.transform_behavior(data["behavior"])
         data["pupil_center"] = self.transform_pupil_center(data["pupil_center"])
         data["image_id"] = self.image_ids[idx]

@@ -1,5 +1,4 @@
 import numpy as np
-import cupy as cp
 from sklearn.linear_model import Ridge
 import argparse
 import torch
@@ -52,9 +51,7 @@ def main():
 
     for idx, mouse in enumerate(['A', 'B', 'C', 'D', 'E']):
         # Load model
-        model = torch.load(f"saved_models/downsampled/with_behaviour/ridge_reg_{mouse}.pkl")
-        n = len(train_ds[mouse].dataset)
-        
+        model = torch.load(f"saved_models/downsampled/with_behaviour/ridge_reg_{mouse}.pkl")        
 
         X_train, y_train, behaviour_train = [], [], []
         for i, batch in enumerate(train_ds[mouse]):
@@ -67,9 +64,9 @@ def main():
             behaviour_train.extend(np.concatenate((behaviour_batch, pupil_batch), axis=1))
         
         # Divide my sqrt(N) like in paper
-        y_train = np.array(y_train) / np.sqrt(n)
         neurons = len(y_train[0])
         y_train = np.concatenate((y_train, behaviour_train), axis=1)
+        y_train = np.array(y_train) / np.sqrt(len(y_train))
         X_train = np.array(X_train)
         print(f"X_train shape (images): {np.array(X_train).shape}")
         print(f"y_train shape (responses): {np.array(y_train).shape}")
@@ -86,8 +83,8 @@ def main():
             behaviour_test.extend(np.concatenate((behaviour_batch, pupil_batch), axis=1))
 
         # Divide my sqrt(N) like in paper
-        y_test = np.array(y_test) / np.sqrt(n)
         y_test = np.concatenate((y_test, np.array(behaviour_test)), axis=1)
+        y_test = np.array(y_test) / np.sqrt(len(y_train))
         print(f"X_test shape (images): {np.array(X_test).shape}")
         print(f"y_test shape (responses): {np.array(y_test).shape}")
 
@@ -123,7 +120,7 @@ def main():
         y_train = np.concatenate((y_train[:, top_voxel_indices], y_train[:, neurons:]), axis=1)
         y_pred_train = np.concatenate((y_pred_train[:, top_voxel_indices], y_pred_train[:, neurons:]), axis=1)
         residuals_train = y_train - y_pred_train
-        Sigma = np.cov(residuals_train, rowvar=False)
+        Sigma = np.diag(np.var(residuals_train, axis=0))
         print(f"Sigma shape: {Sigma.shape}")
 
         term1 = R - R @ B.T @ np.linalg.inv(Sigma + B @ R @ B.T) @ B @ R

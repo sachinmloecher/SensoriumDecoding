@@ -6,6 +6,8 @@ import matplotlib.pyplot as plt
 from sklearn.metrics import r2_score
 from scipy.stats import pearsonr
 from scipy.stats import ttest_1samp
+from skimage.metrics import structural_similarity as ssim
+import pandas as pd
 
 sys.path.append("C:/Users/sachi/SensoriumDecoding/src/utils")
 
@@ -24,6 +26,21 @@ load_args(args)
 def reshape_to_original(image_flat):
     return image_flat.reshape((args.target_size[0], args.target_size[1]))
 
+def calculate_ssim(X_test, X_test_pred):
+    # Reshape to original image shape
+    X_test = X_test.reshape(-1, args.target_size[0], args.target_size[1])
+    X_test_pred = X_test_pred.reshape(-1, args.target_size[0], args.target_size[1])
+
+    # Initialize list to store SSIM values
+    ssim_values = []
+
+    # Calculate SSIM for each sample
+    for i in range(X_test.shape[0]):
+        ssim_value = ssim(X_test[i], X_test_pred[i], data_range=X_test[i].max() - X_test[i].min())
+        ssim_values.append(ssim_value)
+
+    # Return average SSIM
+    return np.mean(ssim_values)
 
 def main():
     train_ds, val_ds, test_ds = get_training_ds(
@@ -43,6 +60,8 @@ def main():
     average_correlations = []
     std_error = []
     significance = {}
+    average_ssim = []
+    data = {'Mouse': [], 'Average Pixel Correlation': [], 'Average SSIM': []}
     for idx, mouse in enumerate(mouse_ids):
         X_test = []
         for i, batch in enumerate(test_ds[mouse]):
@@ -67,6 +86,14 @@ def main():
         sample_correlations = [pearsonr(X_test[i, :], X_test_pred[i, :])[0] for i in range(X_test.shape[0])]
         print("Average sample correlation:", np.mean(sample_correlations))
 
+        avg_ssim = calculate_ssim(X_test, X_test_pred)
+        print("Average SSIM:", avg_ssim)
+        average_ssim.append(avg_ssim)
+
+        data['Mouse'].append(mouse)
+        data['Average Pixel Correlation'].append(np.mean(pixel_correlations))
+        data['Average SSIM'].append(avg_ssim)
+
         best_index = np.argmax(sample_correlations)
         print("Best sample correlation:", sample_correlations[best_index])
 
@@ -82,6 +109,9 @@ def main():
         axes[1, idx].imshow(reconstructed, cmap='gray')
     
     print("Average pixel correlations:", np.mean(average_correlations))
+    print("Average SSIM:", np.mean(average_ssim))
+    data = pd.DataFrame(data)
+    data.to_csv("output/m_1000_with_behaviour/linear_reconstruction_metrics.csv", index=False)
     for mouse in mouse_ids:
         t_val, p_val = significance[mouse]
         print(f"Significance test for mouse {mouse}: t = {t_val}, p = {p_val}")
@@ -95,7 +125,7 @@ def main():
     fig.text(0.03, 0.33, 'Reconstruction', va='center', rotation='vertical', fontsize=16)
 
     # Add figure title
-    fig.suptitle('Best Linear Image Reconstructions with behavioural features (m=1000)', fontsize=20)
+    fig.suptitle('Best Linear Image Reconstructions with Behaviour (m=1000)', fontsize=20)
 
     fig.tight_layout(rect=[0.06, 0.06, 1, 1], pad=0.5, h_pad=0.5, w_pad=0.5)
 
@@ -103,7 +133,7 @@ def main():
     axes2.bar(mouse_ids, average_correlations, yerr=std_error, color=['blue', 'green', 'red', 'purple', 'orange'], capsize=5)
     axes2.set_xlabel('Mouse')
     axes2.set_ylabel('Average Pixel-wise Correlation (r)')
-    axes2.set_title('Average Pixel-wise Correlation for Each Mouse with behavioural features (m=1000)')
+    axes2.set_title('Average Pixel-wise Correlation for Each Mouse with Behaviour (m=1000)')
     axes2.set_ylim([0, 1])
 
     plt.show()
