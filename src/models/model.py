@@ -4,6 +4,8 @@ import torch
 from mouseMLP import MouseMLP
 from behaviourMLP import BehaviourMLP
 from MLP_core import MLP_core
+from VGG_core import InverseVGG
+from mouseGCN import MouseGCN
 
 activations = {
     'relu': nn.ReLU(),
@@ -19,9 +21,12 @@ class FullModel(nn.Module):
         self.behaviour_mlp = behaviour_mlp.to(device) if behaviour_mlp is not None else None
         self.core_mlp = core_mlp.to(device)
 
-    def forward(self, x, behaviours, pupil_centers, mouse_id):
+    def forward(self, x, edge_index, behaviours, pupil_centers, mouse_id):
         # Get output from mouse-specific MLP for the given mouse_id
-        mouse_output = self.mouse_mlp_dict[mouse_id](x)
+        if isinstance(self.mouse_mlp_dict[mouse_id], MouseGCN):
+            mouse_output = self.mouse_mlp_dict[mouse_id](x, edge_index)
+        else:
+            mouse_output = self.mouse_mlp_dict[mouse_id](x)
 
         # Get output from behavior MLP if it exists
         if self.behaviour_mlp is not None:
@@ -43,11 +48,15 @@ def get_model(args):
     mouse_mlp_dict = {}
     for mouse_id in ['A', 'B', 'C', 'D', 'E']:
         input_size = args.neurons_per_mouse[mouse_id]
-        hidden_sizes = args.hidden_sizes
         output_size = args.n_latent_features
         dropout_prob = args.dropout_prob
         activation = activations[args.activation]
-        mouse_mlp_dict[mouse_id] = MouseMLP(input_size, hidden_sizes, output_size, dropout_prob=dropout_prob, activation=activation)
+        if args.mouse_module == 'MLP':
+            hidden_sizes = args.hidden_sizes
+            mouse_mlp_dict[mouse_id] = MouseMLP(input_size, hidden_sizes, output_size, dropout_prob=dropout_prob, activation=activation)
+        elif args.mouse_module == 'GCN':
+            layers = args.layers
+            mouse_mlp_dict[mouse_id] = MouseGCN(input_size, output_size, num_gcn_layers=layers, dropout=dropout_prob, activation=activation)
     
     # Define behaviour MLP
     behaviour_mlp = None
@@ -66,6 +75,10 @@ def get_model(args):
     dropout_prob = args.dropout_prob_mlp
     layer_norm = args.layer_norm
     activation = activations[args.activation_mlp]
-    core_mlp = MLP_core(input_size, hidden_sizes, output_size, dropout_prob=dropout_prob, activation=activation, layerNorm=layer_norm)
-    
-    return FullModel(mouse_mlp_dict, behaviour_mlp, core_mlp, device=args.device)
+    if args.core == 'MLP':
+        core = MLP_core(input_size, hidden_sizes, output_size, dropout_prob=dropout_prob, activation=activation, layerNorm=layer_norm)
+    elif args.core == 'VGG':
+        core = InverseVGG(input_size, output_shape=(1, 36, 64), dropout_prob=dropout_prob, layer_norm=layer_norm)
+    elif args.core == 'ResNet':
+        raise NotImplementedError
+    return FullModel(mouse_mlp_dict, behaviour_mlp, core, device=args.device)

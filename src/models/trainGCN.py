@@ -12,6 +12,7 @@ from skimage.metrics import structural_similarity as ssim
 import typing as t
 from tqdm import tqdm
 from time import time
+from torch_geometric.data import Data
 
 
 from sklearn.metrics import mean_squared_error
@@ -110,7 +111,7 @@ def compute_metrics(y_true: torch.Tensor, y_pred: torch.Tensor):
 
 def train_step(
     mouse_id: str,
-    batch: t.Dict[str, torch.Tensor],
+    batch: Data,
     model: FullModel,
     optimizer: torch.optim,
     criterion: torch.nn.Module,
@@ -118,17 +119,20 @@ def train_step(
     micro_batch_size: int,
     device: torch.device = "cpu"
 ):
-    # Define single train step with microbatching
     model.to(device)
-    batch_size = batch["image"].size(0)
+    batch_size = len(batch.image)
     result = {"loss/loss": []}
     for micro_batch in data.micro_batching(batch, micro_batch_size):
-        y_true = micro_batch["image"].to(device)
+        y_true = torch.stack([torch.from_numpy(img) for img in micro_batch.image]).to(device)
+        print(micro_batch.edge_index.shape)
+        print(np.array(micro_batch.x).shape)
         y_pred = model(
-            x=micro_batch["response"].to(device),
+            x=torch.stack([torch.from_numpy(x) for x in micro_batch.x]).to(device),
+            edge_index=micro_batch.edge_index.to(device),
+            # edge_index=torch.stack([edge_index for edge_index in micro_batch.edge_index]).to(device),
             mouse_id=mouse_id,
-            behaviours=micro_batch["behavior"].to(device),
-            pupil_centers=micro_batch["pupil_center"].to(device)
+            behaviours=torch.stack([torch.from_numpy(behavior) for behavior in micro_batch.behavior]).to(device),
+            pupil_centers=torch.stack([torch.from_numpy(pupil_center) for pupil_center in micro_batch.pupil_center]).to(device)
         )
         y_pred = y_pred.view(y_true.size(0), 36, 64)
         loss = criterion(
@@ -138,7 +142,6 @@ def train_step(
             batch_size=batch_size,
             reduction="sum"
         )
-        # loss /= micro_batch_size
         loss.backward()
         result["loss/loss"].append(loss.detach())
     if update:

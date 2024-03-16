@@ -11,6 +11,8 @@ from torchvision import transforms
 import torch.nn.functional as F
 from ruamel.yaml import YAML
 from torch_geometric.data import Data
+import torch_geometric.loader as tg_data
+
 
 yaml = YAML(typ="safe")
 
@@ -108,12 +110,31 @@ class CycleDataloaders:
         return len(self.ds) * self.max_iterations
 
 
-def micro_batching(batch: t.Dict[str, torch.Tensor], batch_size: int):
-    """Divide batch into micro batches"""
-    indexes = np.arange(0, len(batch["image"]), step=batch_size, dtype=int)
-    for i in indexes:
-        yield {k: v[i : i + batch_size] for k, v in batch.items()}
+# def micro_batching(batch: t.Dict[str, torch.Tensor], batch_size: int):
+#     """Divide batch into micro batches"""
+#     indexes = np.arange(0, len(batch["image"]), step=batch_size, dtype=int)
+#     for i in indexes:
+#         yield {k: v[i : i + batch_size] for k, v in batch.items()}
 
+def micro_batching(batch: Data, micro_batch_size: int):
+    num_samples = len(batch.image)
+    num_edges = batch.edge_index.size(1)
+    edges_per_sample = num_edges // num_samples
+    for i in range(0, num_samples, micro_batch_size):
+        start_edge = i * edges_per_sample
+        end_edge = (i + micro_batch_size) * edges_per_sample
+        micro_batch = Data(
+            x=batch.x[i:i+micro_batch_size],
+            edge_index=batch.edge_index[:, 0:edges_per_sample],
+            # edge_index=batch.edge_index[:, start_edge:end_edge],
+            image=batch.image[i:i+micro_batch_size],
+            behavior=batch.behavior[i:i+micro_batch_size],
+            pupil_center=batch.pupil_center[i:i+micro_batch_size],
+            image_id=batch.image_id[i:i+micro_batch_size],
+            trial_id=batch.trial_id[i:i+micro_batch_size],
+            mouse_id=batch.mouse_id[i:i+micro_batch_size]
+        )
+        yield micro_batch
 
 def unzip(filename: str, unzip_dir: str):
     """Extract zip file with filename to unzip_dir"""
@@ -483,35 +504,89 @@ class MiceDataset(Dataset):
     
     def graph_response(self, response: t.Union[np.ndarray, torch.Tensor]):
         node_features = self.transform_response(response)
-        data = Data(x=node_features, edge_index=self.edge_index)
+        data = Data(x=node_features, edge_index=self.edge_index.t())
         return data
+
+    # def __getitem__(self, idx: t.Union[int, torch.Tensor], include_behavior=True, include_pupil=True):
+    #     """Return data and metadata
+
+    #     Returns
+    #         - data, t.Dict[str, torch.Tensor]
+    #             - image: the natural image in (C, H, W) format
+    #             - response: the corresponding response
+    #             - behavior: pupil size, the derivative of pupil size, and speed
+    #             - pupil_center: the (x, y) coordinate of the center of the pupil
+    #             - image_id: the frame image ID
+    #             - trial_id: the trial ID
+    #             - mouse_id: the mouse ID
+    #     """
+    #     trial = self.indexes[idx]
+    #     data = load_trial_data(mouse_dir=self.mouse_dir, trial=trial)
+    #     data["image"] = self.transform_image(data["image"])
+    #     if self.as_graph:
+    #         data["response"] = self.graph_response(data["response"])
+    #     else:
+    #         data["response"] = self.transform_response(data["response"])
+    #     data["behavior"] = self.transform_behavior(data["behavior"])
+    #     data["pupil_center"] = self.transform_pupil_center(data["pupil_center"])
+    #     data["image_id"] = self.image_ids[idx]
+    #     data["trial_id"] = self.trial_ids[idx]
+    #     data["mouse_id"] = self.mouse_id
+    #     return data
 
     def __getitem__(self, idx: t.Union[int, torch.Tensor], include_behavior=True, include_pupil=True):
         """Return data and metadata
 
         Returns
-            - data, t.Dict[str, torch.Tensor]
-                - image: the natural image in (C, H, W) format
-                - response: the corresponding response
-                - behavior: pupil size, the derivative of pupil size, and speed
-                - pupil_center: the (x, y) coordinate of the center of the pupil
-                - image_id: the frame image ID
-                - trial_id: the trial ID
-                - mouse_id: the mouse ID
+            - If args.as_graph is False:
+                - data, t.Dict[str, torch.Tensor]
+                    - image: the natural image in (C, H, W) format
+                    - response: the corresponding response
+                    - behavior: pupil size, the derivative of pupil size, and speed
+                    - pupil_center: the (x, y) coordinate of the center of the pupil
+                    - image_id: the frame image ID
+                    - trial_id: the trial ID
+                    - mouse_id: the mouse ID
+            - If args.as_graph is True:
+                - data, torch_geometric.data.Data
+                    - image: the natural image in (C, H, W) format
+                    - response: the corresponding response as a graph (x, edge_index)
+                    - behavior: pupil size, the derivative of pupil size, and speed
+                    - pupil_center: the (x, y) coordinate of the center of the pupil
+                    - image_id: the frame image ID
+                    - trial_id: the trial ID
+                    - mouse_id: the mouse ID
         """
         trial = self.indexes[idx]
         data = load_trial_data(mouse_dir=self.mouse_dir, trial=trial)
         data["image"] = self.transform_image(data["image"])
+        
         if self.as_graph:
-            data["response"] = self.graph_response(data["response"])
+            response = self.graph_response(data["response"])
+            response.image = data["image"]
+            response.behavior = self.transform_behavior(data["behavior"])
+            response.pupil_center = self.transform_pupil_center(data["pupil_center"])
+            response.image_id = self.image_ids[idx]
+            response.trial_id = self.trial_ids[idx]
+            response.mouse_id = self.mouse_id
+            # data = Data(
+            #     image=data["image"],
+            #     behavior=self.transform_behavior(data["behavior"]),
+            #     pupil_center=self.transform_pupil_center(data["pupil_center"]),
+            #     image_id=self.image_ids[idx],
+            #     trial_id=self.trial_ids[idx],
+            #     mouse_id=self.mouse_id
+            # )
+            return response
         else:
             data["response"] = self.transform_response(data["response"])
-        data["behavior"] = self.transform_behavior(data["behavior"])
-        data["pupil_center"] = self.transform_pupil_center(data["pupil_center"])
-        data["image_id"] = self.image_ids[idx]
-        data["trial_id"] = self.trial_ids[idx]
-        data["mouse_id"] = self.mouse_id
-        return data
+            data["behavior"] = self.transform_behavior(data["behavior"])
+            data["pupil_center"] = self.transform_pupil_center(data["pupil_center"])
+            data["image_id"] = self.image_ids[idx]
+            data["trial_id"] = self.trial_ids[idx]
+            data["mouse_id"] = self.mouse_id
+        
+            return data
 
 
 def get_datasets(
@@ -548,6 +623,7 @@ def get_datasets(
 
     return datasets["train"], datasets["validation"], datasets["test"]
 
+
 def get_training_ds(
     args,
     data_dir: str,
@@ -583,6 +659,8 @@ def get_training_ds(
     # a dictionary of DataLoader for each train, validation and test set
     train_ds, val_ds, test_ds = {}, {}, {}
     args.output_shapes = {}
+
+    DataLoader = tg_data.DataLoader if args.as_graph else torch.utils.data.DataLoader
 
     for mouse_id in mouse_ids:
         train_ds[mouse_id] = DataLoader(
