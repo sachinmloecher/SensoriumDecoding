@@ -32,7 +32,7 @@ os.chdir("C:/Users/sachi/SensoriumDecoding")
 
 class Args:
     def __init__(self):
-        self.output_dir = "runs\DNN\mouseGCN1_relu_coreMLP"
+        self.output_dir = "runs\DNN\mouseGraphConv1_128_nn30_tanh_coreMLP"
 args = Args()
 load_args(args)
 
@@ -109,6 +109,7 @@ def compute_metrics(y_true: torch.Tensor, y_pred: torch.Tensor):
         "ssim": ssim_score.item(),
     }
 
+
 def train_step(
     mouse_id: str,
     batch: Data,
@@ -122,28 +123,27 @@ def train_step(
     model.to(device)
     batch_size = len(batch.image)
     result = {"loss/loss": []}
-    for micro_batch in data.micro_batching(batch, micro_batch_size):
-        y_true = torch.stack([torch.from_numpy(img) for img in micro_batch.image]).to(device)
-        print(micro_batch.edge_index.shape)
-        print(np.array(micro_batch.x).shape)
-        y_pred = model(
-            x=torch.stack([torch.from_numpy(x) for x in micro_batch.x]).to(device),
-            edge_index=micro_batch.edge_index.to(device),
-            # edge_index=torch.stack([edge_index for edge_index in micro_batch.edge_index]).to(device),
-            mouse_id=mouse_id,
-            behaviours=torch.stack([torch.from_numpy(behavior) for behavior in micro_batch.behavior]).to(device),
-            pupil_centers=torch.stack([torch.from_numpy(pupil_center) for pupil_center in micro_batch.pupil_center]).to(device)
-        )
-        y_pred = y_pred.view(y_true.size(0), 36, 64)
-        loss = criterion(
-            y_true=y_true,
-            y_pred=y_pred,
-            mouse_id=mouse_id,
-            batch_size=batch_size,
-            reduction="sum"
-        )
-        loss.backward()
-        result["loss/loss"].append(loss.detach())
+
+    y_true = torch.stack([torch.from_numpy(img) for img in batch.image]).to(device)
+    y_pred = model(
+        x=batch.x.unsqueeze(1).to(device),
+        edge_index=batch.edge_index.to(device),
+        batch=batch.batch.to(device),
+        mouse_id=mouse_id,
+        behaviours=torch.stack([torch.from_numpy(behavior) for behavior in batch.behavior]).to(device),
+        pupil_centers=torch.stack([torch.from_numpy(pupil_center) for pupil_center in batch.pupil_center]).to(device)
+    )
+    y_pred = y_pred.view(y_true.size(0), 36, 64)
+    loss = criterion(
+        y_true=y_true,
+        y_pred=y_pred,
+        mouse_id=mouse_id,
+        batch_size=batch_size,
+        reduction="sum"
+    )
+    loss.backward()
+    result["loss/loss"].append(loss.detach())
+
     if update:
         optimizer.step()
         optimizer.zero_grad()
@@ -189,29 +189,30 @@ def validation_step(
     device: torch.device = "cpu"
 ):
     model.to(device)
-    batch_size = batch["image"].size(0)
+    batch_size = len(batch.image)
     result = {"loss/loss": []}
     targets, predictions = [], []
-    for micro_batch in data.micro_batching(batch, micro_batch_size):
-        y_true = micro_batch["image"].to(device)
-        y_pred = model(
-            x=micro_batch["response"].to(device),
-            mouse_id=mouse_id,
-            behaviours=micro_batch["behavior"].to(device),
-            pupil_centers=micro_batch["pupil_center"].to(device),
-        )
-        y_pred = y_pred.view(y_true.size(0), 36, 64)
-        loss = criterion(
-            y_true=y_true,
-            y_pred=y_pred,
-            mouse_id=mouse_id,
-            batch_size=batch_size,
-            reduction="sum"
-        )
-        # loss /= micro_batch_size
-        result["loss/loss"].append(loss)
-        targets.append(y_true)
-        predictions.append(y_pred)
+    y_true = torch.stack([torch.from_numpy(img) for img in batch.image]).to(device)
+    y_pred = model(
+        x=batch.x.unsqueeze(1).to(device),
+        edge_index=batch.edge_index.to(device),
+        batch=batch.batch.to(device),
+        mouse_id=mouse_id,
+        behaviours=torch.stack([torch.from_numpy(behavior) for behavior in batch.behavior]).to(device),
+        pupil_centers=torch.stack([torch.from_numpy(pupil_center) for pupil_center in batch.pupil_center]).to(device)
+    )
+    y_pred = y_pred.view(y_true.size(0), 36, 64)
+    loss = criterion(
+        y_true=y_true,
+        y_pred=y_pred,
+        mouse_id=mouse_id,
+        batch_size=batch_size,
+        reduction="sum"
+    )
+    # loss /= micro_batch_size
+    result["loss/loss"].append(loss)
+    targets.append(y_true)
+    predictions.append(y_pred)
     return gather(result), vstack(targets), vstack(predictions)
 
 

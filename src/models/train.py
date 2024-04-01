@@ -31,7 +31,7 @@ os.chdir("C:/Users/sachi/SensoriumDecoding")
 
 class Args:
     def __init__(self):
-        self.output_dir = "runs\DNN\mouseGCN1_relu_coreMLP"
+        self.output_dir = "runs\DNN\mouseMLP_4500_3000_tanh_02_Decoder_512_tanh_Behaviour_02"
 args = Args()
 load_args(args)
 
@@ -126,6 +126,8 @@ def train_step(
         y_true = micro_batch["image"].to(device)
         y_pred = model(
             x=micro_batch["response"].to(device),
+            edge_index = None,
+            batch = None,
             mouse_id=mouse_id,
             behaviours=micro_batch["behavior"].to(device),
             pupil_centers=micro_batch["pupil_center"].to(device)
@@ -193,6 +195,8 @@ def validation_step(
         y_true = micro_batch["image"].to(device)
         y_pred = model(
             x=micro_batch["response"].to(device),
+            edge_index = None,
+            batch = None,
             mouse_id=mouse_id,
             behaviours=micro_batch["behavior"].to(device),
             pupil_centers=micro_batch["pupil_center"].to(device),

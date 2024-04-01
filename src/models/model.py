@@ -4,8 +4,10 @@ import torch
 from mouseMLP import MouseMLP
 from behaviourMLP import BehaviourMLP
 from MLP_core import MLP_core
-from VGG_core import InverseVGG
 from mouseGCN import MouseGCN
+from mouseGAT import MouseGAT
+from mouseGraphConv import MouseGraphConvNet
+from decoderCore import Decoder
 
 activations = {
     'relu': nn.ReLU(),
@@ -21,21 +23,23 @@ class FullModel(nn.Module):
         self.behaviour_mlp = behaviour_mlp.to(device) if behaviour_mlp is not None else None
         self.core_mlp = core_mlp.to(device)
 
-    def forward(self, x, edge_index, behaviours, pupil_centers, mouse_id):
+    def forward(self, x, edge_index, batch, behaviours, pupil_centers, mouse_id):
         # Get output from mouse-specific MLP for the given mouse_id
-        if isinstance(self.mouse_mlp_dict[mouse_id], MouseGCN):
-            mouse_output = self.mouse_mlp_dict[mouse_id](x, edge_index)
+        if isinstance(self.mouse_mlp_dict[mouse_id], MouseGCN) or isinstance(self.mouse_mlp_dict[mouse_id], MouseGAT) or isinstance(self.mouse_mlp_dict[mouse_id], MouseGraphConvNet):
+            mouse_output = self.mouse_mlp_dict[mouse_id](x, edge_index, batch)
         else:
             mouse_output = self.mouse_mlp_dict[mouse_id](x)
+        
+        # Concatenate pupil centers with behaviours
+        behaviours = torch.cat((behaviours, pupil_centers), dim=1).to(self.device)
 
         # Get output from behavior MLP if it exists
         if self.behaviour_mlp is not None:
             behaviour_output = self.behaviour_mlp(behaviours)
+            combined_features = torch.add(mouse_output, behaviour_output).to(self.device)
         else:
-            behaviour_output = torch.tensor([]).to(self.device)
-
-        # Concatenate mouse and behavior outputs
-        combined_features = torch.cat((mouse_output, behaviour_output), dim=1)
+            combined_features = mouse_output
+                
 
         # Pass concatenated features through the core MLP
         output = self.core_mlp(combined_features)
@@ -56,8 +60,17 @@ def get_model(args):
             mouse_mlp_dict[mouse_id] = MouseMLP(input_size, hidden_sizes, output_size, dropout_prob=dropout_prob, activation=activation)
         elif args.mouse_module == 'GCN':
             layers = args.layers
-            mouse_mlp_dict[mouse_id] = MouseGCN(input_size, output_size, num_gcn_layers=layers, dropout=dropout_prob, activation=activation)
-    
+            hidden_size = args.hidden_size
+            mouse_mlp_dict[mouse_id] = MouseGCN(1, hidden_size, output_size, num_gcn_layers=layers, dropout=dropout_prob, activation=activation)
+        elif args.mouse_module == 'GAT':
+            layers = args.layers
+            hidden_size = args.hidden_size
+            mouse_mlp_dict[mouse_id] = MouseGAT(1, hidden_size, output_size, num_gat_layers=layers, dropout=dropout_prob, activation=activation)
+        elif args.mouse_module == 'GraphConv':
+            layers = args.layers
+            hidden_size = args.hidden_size
+            mouse_mlp_dict[mouse_id] = MouseGraphConvNet(1, hidden_size, output_size, num_graph_conv_layers=layers, dropout=dropout_prob, activation=activation)
+
     # Define behaviour MLP
     behaviour_mlp = None
     if args.behavior_mode:
@@ -77,8 +90,7 @@ def get_model(args):
     activation = activations[args.activation_mlp]
     if args.core == 'MLP':
         core = MLP_core(input_size, hidden_sizes, output_size, dropout_prob=dropout_prob, activation=activation, layerNorm=layer_norm)
-    elif args.core == 'VGG':
-        core = InverseVGG(input_size, output_shape=(1, 36, 64), dropout_prob=dropout_prob, layer_norm=layer_norm)
-    elif args.core == 'ResNet':
-        raise NotImplementedError
+    elif args.core == 'Decoder':
+        core = Decoder(input_size, args.downsampled_input, output_size, dropout_prob=dropout_prob, activation=activation, layerNorm=layer_norm)
+
     return FullModel(mouse_mlp_dict, behaviour_mlp, core, device=args.device)

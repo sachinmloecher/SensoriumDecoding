@@ -31,7 +31,7 @@ os.chdir("C:/Users/sachi/SensoriumDecoding")
 
 class Args:
     def __init__(self):
-        self.output_dir = "runs/DNN/mouseMLP_4500_3000_tanh_coreMLP"
+        self.output_dir = "runs/DNN/mouseMLP_4500_3000_tanh_02_Decoder_512_tanh_Behaviour"
 args = Args()
 load_args(args)
 
@@ -99,6 +99,8 @@ def test_step(
         y_true = micro_batch["image"].to(device)
         y_pred = model(
             x=micro_batch["response"].to(device),
+            edge_index=None,
+            batch=None,
             mouse_id=mouse_id,
             behaviours=micro_batch["behavior"].to(device),
             pupil_centers=micro_batch["pupil_center"].to(device),
@@ -165,7 +167,7 @@ def main(args):
     scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=args.lr_step_size, gamma=args.lr_gamma)
     criterion = get_criterion(args, ds=test_ds)
 
-    model, optimizer, scheduler, epoch, history = load_checkpoint(args, "checkpoint_000000.pt", model, optimizer, scheduler)
+    model, optimizer, scheduler, epoch, history = load_checkpoint(args, "checkpoint_epoch_54.pt", model, optimizer, scheduler)
     test_results = test(args, test_ds, model, criterion, epoch)
 
     print(
@@ -181,3 +183,6 @@ def main(args):
     plt.xlabel('Epoch')
     plt.legend(['Train', 'Val'], loc='upper left')
     plt.show()
+
+if __name__ == "__main__":
+    main(args)
